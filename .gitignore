@@ -1,0 +1,39 @@
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs
+*.log
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+client/node_modules
+server/node_modules
+
+# Build directories
+client/build
+client/dist
+server/dist
+
+# Environment variables
+client/.env
+client/.env.local
+client/.env.*.local
+server/.env
+server/.env.local
+server/.env.*.local
+
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+client/.env.production.local
+server/.env.production.local

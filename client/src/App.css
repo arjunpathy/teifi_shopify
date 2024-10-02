@@ -1,0 +1,17 @@
+.profile-container {
+  display: inline-flex;
+  align-items: flex-start;
+  font-weight: bold;
+}
+.profile-container div {
+  display: inline-flex;
+  gap: 1rem;
+  padding-left: 0.5rem;
+}
+.customer-title-section {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  align-items: center;
+  border-bottom: 1px solid #e0e0e0;
+}
