@@ -103,8 +103,8 @@ function App() {
         let action = editFlag ? "Update" : "Create";
         let fieldName = `customer${action}`;
 
-        if (resp.data[fieldName].userErrors.length) {
-          setUserErrors([...resp.data[fieldName].userErrors]);
+        if (resp[fieldName].userErrors.length) {
+          setUserErrors([...resp[fieldName].userErrors]);
         }
         else {
           clearCustomerForm();
