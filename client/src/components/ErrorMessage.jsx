@@ -1,10 +1,10 @@
 import { Modal, Banner, List, BlockStack } from "@shopify/polaris";
 
-const ErrorMessage = ({ userErrors, dismissErrorMessage, title, tone }) => {
+const ErrorMessage = ({ userErrors, setUserErrors, title, tone }) => {
   return userErrors.length ? (
     <Modal
       open={userErrors.length}
-      onClose={dismissErrorMessage}
+      onClose={() => setUserErrors([])}
       title={title}
       tone={tone}
       instant={false}

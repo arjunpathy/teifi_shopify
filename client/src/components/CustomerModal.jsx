@@ -12,7 +12,6 @@ const CustomerModal = ({
   customer,
   errors,
   tagsString,
-  clearCustomerForm,
   handleSubmit,
   handleInputChange,
   handleModalChange,
@@ -22,7 +21,9 @@ const CustomerModal = ({
       open={active}
       onClose={handleModalChange}
       instant={false}
-      title= {action ==='Update' ? "Update existing customer" : "Create new customer"}
+      title={
+        action === "Update" ? "Update existing customer" : "Create new customer"
+      }
       primaryAction={{
         content: action,
         onAction: handleSubmit,
@@ -32,8 +33,8 @@ const CustomerModal = ({
       secondaryActions={[
         {
           content: "Cancel",
-          onAction: ()=>{handleModalChange();clearCustomerForm();},
-          accessibilityLabel:"Cancel"
+          onAction: handleModalChange,
+          accessibilityLabel: "Cancel",
         },
       ]}
     >

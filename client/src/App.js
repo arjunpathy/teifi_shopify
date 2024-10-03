@@ -6,9 +6,12 @@ import CustomerModal from './components/CustomerModal';
 import { EditIcon, DeleteIcon, PersonAddIcon } from '@shopify/polaris-icons';
 import ErrorMessage from './components/ErrorMessage';
 import DeleteConfirmationModal from './components/DeleteConfirmationModal';
+import { isPossiblePhoneNumber, parsePhoneNumber } from 'libphonenumber-js'
 
 const SHOPIFY_SERVER_URL = process.env.REACT_APP_SHOPIFY_SERVER_URL;
-const PAGINATION_LIMIT = 4;
+const PAGINATION_LIMIT = 5;
+let paginationStack = [];
+let pageNumber = 0;
 
 function App() {
   const [customer, setCustomer] = useState({
@@ -66,9 +69,8 @@ function App() {
       formErrors.email = 'Email is not valid.';
     }
 
-    if (customer.phone && !/^\+?(\d{1,3})?[-.\s]?(\(?\d{1,4}\)?)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{0,9}$/.test(customer.phone)) {
+    if (customer.phone && !isPossiblePhoneNumber(customer.phone))
       formErrors.phone = 'Enter a valid phone number.';
-    }
 
     setErrors(formErrors);
 
@@ -98,7 +100,6 @@ function App() {
       .then((response) => response.json())
       .then((resp) => {
         handleModalChange();
-        console.log(resp)
         let action = editFlag ? "Update" : "Create";
         let fieldName = `customer${action}`;
 
@@ -107,25 +108,17 @@ function App() {
         }
         else {
           clearCustomerForm();
-          let newCustomer = resp.data[fieldName].customer;
-          newCustomer.id = newCustomer.id.split('/').pop();
-          console.log("new cust", newCustomer)
-
-          if (editFlag) {
-            const updatedCustomerList = customerList.map(currentCustomer => currentCustomer.id === newCustomer.id ? newCustomer : currentCustomer);
-            setCustomerList(updatedCustomerList)
-          } else {
-            if (customerList.length < PAGINATION_LIMIT)
-              setCustomerList([...customerList, newCustomer])
-            else
-              setPageInfo((prev) => ({ ...prev, hasNextPage: true, }));
-          }
+          handlePagination('refresh');
         }
       }).catch((error) => console.error(error));
   };
 
   const fetchCustomers = async (direction, cursor = '', limit = PAGINATION_LIMIT) => {
+
     setIsLoading(true);
+    if (!paginationStack[pageNumber])
+      paginationStack[pageNumber] = [direction, cursor, limit];
+
     try {
       const response = await fetch(`${SHOPIFY_SERVER_URL}/customers?cursor=${cursor}&direction=${direction}&limit=${limit}`);
       const formattedResponse = await response.json();
@@ -156,16 +149,22 @@ function App() {
 
   const handlePagination = async (direction) => {
     if (direction === 'forward' && pageInfo.hasNextPage) {
+      pageNumber++;
       const data = await fetchCustomers(direction, pageInfo.endCursor);
       resetList(data);
     } else if (direction === 'backward' && pageInfo.hasPreviousPage) {
+      pageNumber--;
       const data = await fetchCustomers(direction, pageInfo.startCursor);
+      resetList(data);
+    }
+    else if (direction === 'refresh') {
+      const data = await fetchCustomers(paginationStack[pageNumber][0], paginationStack[pageNumber][1], paginationStack[pageNumber][2]);
       resetList(data);
     }
   };
 
   const handleCustomerCreate = () => {
-    setActive(true); setEditFlag(false); clearCustomerForm(); setUserErrors([])
+    setActive(true); setEditFlag(false); clearCustomerForm(); setUserErrors([]);
   }
 
   const handleEdit = (customer) => {
@@ -186,19 +185,9 @@ function App() {
     fetch(`${SHOPIFY_SERVER_URL}/customers/${customer.id}`, { method: 'DELETE' })
       .then((response) => response.json())
       .then(async () => {
-        if (customerList.length === 1 && pageInfo.hasPreviousPage) {
-          // If the last customer on the page is deleted, go to the previous page
-          handlePagination('backward');
-        } else {
-          // Fetch the current page after deletion or add a new customer to the list if available
-          let updatedList = customerList.filter(c => c.id !== customer.id);
-          if (pageInfo.hasNextPage) {
-            let customerData = await fetchCustomers('forward', pageInfo.endCursor, 1);
-            updatedList.push(customerData.customers[0]); // Add new customers to the list
-          }
-          setCustomerList([...updatedList]);
-          setIsLoading(false);
-        }
+        if (customerList.length === 1 && pageInfo.hasPreviousPage)
+          pageNumber--;
+        handlePagination('refresh');
       })
       .catch((error) => console.error(error));
   };
@@ -208,7 +197,7 @@ function App() {
     setTagsString("");
   }
 
-  const handleModalChange = useCallback(() => setActive(!active), [active]);
+  const handleModalChange = useCallback(() => { setActive(!active); clearCustomerForm(); setErrors({}); }, [active]);
   const handleDeleteConfirmation = useCallback(() => setDeleteConfirmation(!showDeleteConfirmation), [showDeleteConfirmation]);
 
   useEffect(() => {
@@ -233,7 +222,7 @@ function App() {
   return (
     <AppProvider i18n={enTranslations}>
       <Page title="Customers">
-        <ErrorMessage userErrors={userErrors} dismissErrorMessage={() => setUserErrors([])} tone='critical' title={editFlag ? "Customer update failed" : "Customer creation failed"} />
+        <ErrorMessage userErrors={userErrors} setUserErrors={setUserErrors} tone='critical' title={editFlag ? "Customer update failed" : "Customer creation failed"} />
         <DeleteConfirmationModal isOpen={showDeleteConfirmation} handleChange={handleDeleteConfirmation} customer={customer} tone='critical' deleteCustomer={deleteCustomer} />
         <Card>
           <ResourceList
@@ -255,10 +244,10 @@ function App() {
               const shortcutActions = [{ icon: EditIcon, onClick: () => { handleEdit(customer) }, variant: "plain", accessibilityLabel: "Edit customer" }, { icon: DeleteIcon, onClick: () => { handleDelete(customer) }, tone: "critical", variant: "plain", accessibilityLabel: "Delete customer" }];
 
               return (
-                <ResourceItem id={id} media={media} accessibilityLabel={`View details for ${firstName}`} shortcutActions={shortcutActions}  >
+                <ResourceItem id={id} media={media} accessibilityLabel={`View details for ${firstName} ${lastName}`} shortcutActions={shortcutActions}  >
                   <Text variant="bodyMd" fontWeight="bold" as="h3">{firstName} {lastName}</Text>
                   <div>{email}</div>
-                  <div>{phone}</div>
+                  <div>{phone && parsePhoneNumber(phone).formatInternational()}</div>
                   {customer.tags.length > 0 && (
                     <InlineStack gap="200" alignment="center">
                       {customer.tags.map((tag) => (
@@ -272,7 +261,7 @@ function App() {
           />
         </Card>
 
-        <CustomerModal active={active} action={editFlag ? "Update" : "Save"} customer={customer} tagsString={tagsString} handleModalChange={handleModalChange} handleSubmit={handleSubmit} handleInputChange={handleInputChange} errors={errors} clearCustomerForm={clearCustomerForm} />
+        <CustomerModal active={active} action={editFlag ? "Update" : "Save"} customer={customer} tagsString={tagsString} handleModalChange={handleModalChange} handleSubmit={handleSubmit} handleInputChange={handleInputChange} errors={errors} />
       </Page>
     </AppProvider>
   );
