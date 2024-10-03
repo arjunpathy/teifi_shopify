@@ -7,7 +7,7 @@ const ErrorMessage = ({ userErrors, setUserErrors, title, tone }) => {
     <Modal
       open={userErrors.length}
       onClose={() => setUserErrors([])}
-      title={title}
+      title={title +" failed"}
       tone={tone}
       instant={false}
     >

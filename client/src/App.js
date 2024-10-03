@@ -30,6 +30,7 @@ function App() {
   const [tagsString, setTagsString] = useState('');
   const [showDeleteConfirmation, setDeleteConfirmation] = useState(false);
   const [active, setActive] = useState(false);
+  const [userErrorModalTitle, setUserErrorModalTitle] = useState("")
 
   const [emptyStateMarkup, setEmptyStateMarkup] = useState(null)
 
@@ -87,7 +88,9 @@ function App() {
 
     let [url, method] = editFlag ? [`${SHOPIFY_SERVER_URL}/customers/${customer.id}`, `PUT`] : [`${SHOPIFY_SERVER_URL}/customers`, `POST`];
     customer.phone = customer.phone || "";
-    customer.tags = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
+    customer.tags = [...new Set(tagsString.split(',').map(tag => tag.trim()).filter(tag => tag !== ''))];
+
+    console.log(customer)
 
     const options = {
       method: method,
@@ -99,6 +102,7 @@ function App() {
       .then((response) => response.json())
       .then((resp) => {
         handleModalChange();
+        setTagsString('');
         let action = editFlag ? "Update" : "Create";
         let fieldName = `customer${action}`;
 
@@ -163,7 +167,9 @@ function App() {
   };
 
   const handleCustomerCreate = () => {
-    setActive(true); setEditFlag(false); clearCustomerForm(); setUserErrors([]);
+    setActive(true); setEditFlag(false);
+    clearCustomerForm(); setUserErrors([]);
+    setUserErrorModalTitle("Customer creation")
   }
 
   const handleEdit = (customer) => {
@@ -172,19 +178,24 @@ function App() {
     setCustomer(customer);
     setActive(true);
     setUserErrors([])
+    setUserErrorModalTitle("Customer update");
   }
 
   const handleDelete = (customer) => {
     setDeleteConfirmation(true);
     setCustomer(customer);
+    setUserErrorModalTitle("Customer deletion");
   }
 
   const deleteCustomer = (customer) => {
     handleDeleteConfirmation();
     fetch(`${SHOPIFY_SERVER_URL}/customers/${customer.id}`, { method: 'DELETE' })
       .then((response) => response.json())
-      .then(async () => {
-        if (customerList.length === 1 && pageInfo.hasPreviousPage)
+      .then(async (resp) => {
+        console.log(resp)
+        if (resp.customerDelete.userErrors.length) {
+          setUserErrors(resp.customerDelete.userErrors);
+        } else if (customerList.length === 1 && pageInfo.hasPreviousPage)
           pageNumber--;
         handlePagination('refresh');
       })
@@ -221,7 +232,7 @@ function App() {
   return (
     <AppProvider i18n={enTranslations}>
       <Page title="Customers">
-        <ErrorMessage userErrors={userErrors} setUserErrors={setUserErrors} tone='critical' title={editFlag ? "Customer update failed" : "Customer creation failed"} />
+        <ErrorMessage userErrors={userErrors} setUserErrors={setUserErrors} tone='critical' title={userErrorModalTitle} />
         <DeleteConfirmationModal isOpen={showDeleteConfirmation} handleChange={handleDeleteConfirmation} customer={customer} tone='critical' deleteCustomer={deleteCustomer} />
         <Card>
           <ResourceList
