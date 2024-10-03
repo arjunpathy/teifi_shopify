@@ -1,4 +1,3 @@
-import './App.css';
 import { useState, useEffect, useCallback } from 'react';
 import enTranslations from '@shopify/polaris/locales/en.json';
 import { AppProvider, Avatar, Page, Card, Button, Tag, EmptyState, InlineStack, ResourceList, ResourceItem, Text } from '@shopify/polaris';
