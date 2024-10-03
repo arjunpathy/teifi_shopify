@@ -1,13 +1,14 @@
 import './App.css';
 import { useState, useEffect, useCallback } from 'react';
 import enTranslations from '@shopify/polaris/locales/en.json';
-import { AppProvider, Avatar, Page, Card, Button, Tag, InlineStack, ResourceList, ResourceItem, Text } from '@shopify/polaris';
+import { AppProvider, Avatar, Page, Card, Button, Tag, EmptyState, InlineStack, ResourceList, ResourceItem, Text } from '@shopify/polaris';
 import CustomerModal from './components/CustomerModal';
-import { PlusIcon, EditIcon, DeleteIcon } from '@shopify/polaris-icons';
+import { EditIcon, DeleteIcon, PersonAddIcon } from '@shopify/polaris-icons';
 import ErrorMessage from './components/ErrorMessage';
+import DeleteConfirmationModal from './components/DeleteConfirmationModal';
 
-
-const SHOPIFY_SERVER_URL = process.env.SHOPIFY_SERVER_URL || 'http://localhost:3030';
+const SHOPIFY_SERVER_URL = process.env.REACT_APP_SHOPIFY_SERVER_URL;
+const PAGINATION_LIMIT = 4;
 
 function App() {
   const [customer, setCustomer] = useState({
@@ -23,9 +24,12 @@ function App() {
   const [userErrors, setUserErrors] = useState([]);
   const [pageInfo, setPageInfo] = useState({});
   const [isLoading, setIsLoading] = useState(true);
-  const [paginationStack, setPaginationStack] = useState({ next: [], previous: [] });
   const [editFlag, setEditFlag] = useState(false)
   const [tagsString, setTagsString] = useState('');
+  const [showDeleteConfirmation, setDeleteConfirmation] = useState(false);
+  const [active, setActive] = useState(false);
+
+  const [emptyStateMarkup, setEmptyStateMarkup] = useState(null)
 
   const handleInputChange = (value, name) => {
     if (name === 'tags') {
@@ -72,60 +76,97 @@ function App() {
     return Object.keys(formErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) {
       return;
     }
+
     let [url, method] = editFlag ? [`${SHOPIFY_SERVER_URL}/customers/${customer.id}`, `PUT`] : [`${SHOPIFY_SERVER_URL}/customers`, `POST`];
     customer.phone = customer.phone || "";
-    customer.tags = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag !== '')
+    customer.tags = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
 
     const options = {
       method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(customer),
     };
-    fetch(url, options)
+
+    await fetch(url, options)
       .then((response) => response.json())
       .then((resp) => {
         handleModalChange();
-        let fieldName = editFlag ? "customerUpdate" : "customerCreate";
+        console.log(resp)
+        let action = editFlag ? "Update" : "Create";
+        let fieldName = `customer${action}`;
+
         if (resp.data[fieldName].userErrors.length) {
-          setUserErrors([...resp.data[fieldName].userErrors])
-        } else {
-          clearCustomer();
-          fetchCustomers();
+          setUserErrors([...resp.data[fieldName].userErrors]);
         }
-      })
-      .catch((error) => console.error(error));
+        else {
+          clearCustomerForm();
+          let newCustomer = resp.data[fieldName].customer;
+          newCustomer.id = newCustomer.id.split('/').pop();
+          console.log("new cust", newCustomer)
+
+          if (editFlag) {
+            const updatedCustomerList = customerList.map(currentCustomer => currentCustomer.id === newCustomer.id ? newCustomer : currentCustomer);
+            setCustomerList(updatedCustomerList)
+          } else {
+            if (customerList.length < PAGINATION_LIMIT)
+              setCustomerList([...customerList, newCustomer])
+            else
+              setPageInfo((prev) => ({ ...prev, hasNextPage: true, }));
+          }
+        }
+      }).catch((error) => console.error(error));
   };
 
-  const fetchCustomers = async (cursor = '') => {
+  const fetchCustomers = async (direction, cursor = '', limit = PAGINATION_LIMIT) => {
     setIsLoading(true);
-    const response = await fetch(`${SHOPIFY_SERVER_URL}/customers?cursor=${cursor}`);
-    const formattedResponse = await response.json();
-    setCustomerList(formattedResponse.customers);
-    setPageInfo(formattedResponse.pageInfo);
-    setIsLoading(false);
-
-    if (cursor && formattedResponse.pageInfo.hasNextPage) {
-      setPaginationStack((prevState) => ({
-        next: [...prevState.next, formattedResponse.pageInfo.endCursor],
-        previous: [...prevState.previous, cursor],
-      }));
+    try {
+      const response = await fetch(`${SHOPIFY_SERVER_URL}/customers?cursor=${cursor}&direction=${direction}&limit=${limit}`);
+      const formattedResponse = await response.json();
+      if (!formattedResponse || !formattedResponse.customers) {
+        console.error('Invalid API response:', formattedResponse);
+        return { customers: [], pageInfo: {} }; // Fallback to empty data
+      }
+      return formattedResponse;
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      return { customers: [], pageInfo: {} }; // Fallback in case of error
     }
   };
 
-  const handleNextPage = () => {
-    if (pageInfo.endCursor) fetchCustomers(pageInfo.endCursor);
+  const resetList = (formattedResponse) => {
+    if (formattedResponse && formattedResponse.customers) {
+      setCustomerList(formattedResponse.customers);
+    } else {
+      console.error('Invalid data format received:', formattedResponse);
+      setCustomerList([]); // Fallback to empty list in case of invalid data
+    }
+    if (formattedResponse && formattedResponse.pageInfo) {
+      setPageInfo(formattedResponse.pageInfo);
+    }
+    setIsLoading(false);
   };
 
-  const handlePreviousPage = () => {
-    const prevCursor = paginationStack.previous.pop();
-    if (prevCursor) fetchCustomers(prevCursor);
+
+  const handlePagination = async (direction) => {
+    if (direction === 'forward' && pageInfo.hasNextPage) {
+      const data = await fetchCustomers(direction, pageInfo.endCursor);
+      resetList(data);
+    } else if (direction === 'backward' && pageInfo.hasPreviousPage) {
+      const data = await fetchCustomers(direction, pageInfo.startCursor);
+      resetList(data);
+    }
   };
+
+  const handleCustomerCreate = () => {
+    setActive(true); setEditFlag(false); clearCustomerForm(); setUserErrors([])
+  }
 
   const handleEdit = (customer) => {
     setEditFlag(true);
@@ -135,50 +176,83 @@ function App() {
     setUserErrors([])
   }
 
-  const handleDelete = (id) => {
-    var answer = window.confirm("Delete customer ?");
-    if (answer) {
-      fetch(`${SHOPIFY_SERVER_URL}/customers/${id}`, { method: 'DELETE' })
-        .then((response) => response.json())
-        .then(() => { fetchCustomers() })
-        .catch((error) => console.error(error));
-    }
+  const handleDelete = (customer) => {
+    setDeleteConfirmation(true);
+    setCustomer(customer);
   }
 
+  const deleteCustomer = (customer) => {
+    handleDeleteConfirmation();
+    fetch(`${SHOPIFY_SERVER_URL}/customers/${customer.id}`, { method: 'DELETE' })
+      .then((response) => response.json())
+      .then(async () => {
+        if (customerList.length === 1 && pageInfo.hasPreviousPage) {
+          // If the last customer on the page is deleted, go to the previous page
+          handlePagination('backward');
+        } else {
+          // Fetch the current page after deletion or add a new customer to the list if available
+          let updatedList = customerList.filter(c => c.id !== customer.id);
+          if (pageInfo.hasNextPage) {
+            let customerData = await fetchCustomers('forward', pageInfo.endCursor, 1);
+            updatedList.push(customerData.customers[0]); // Add new customers to the list
+          }
+          setCustomerList([...updatedList]);
+          setIsLoading(false);
+        }
+      })
+      .catch((error) => console.error(error));
+  };
 
-  const clearCustomer = () => {
+  const clearCustomerForm = () => {
     setCustomer({ id: '', firstName: '', lastName: '', email: '', phone: '', tags: [] });
     setTagsString("");
   }
 
-  const [active, setActive] = useState(false);
   const handleModalChange = useCallback(() => setActive(!active), [active]);
+  const handleDeleteConfirmation = useCallback(() => setDeleteConfirmation(!showDeleteConfirmation), [showDeleteConfirmation]);
 
   useEffect(() => {
-    fetchCustomers();
+    const fetchData = async () => {
+      const data = await fetchCustomers('forward');
+      resetList(data);
+    };
+    fetchData();
   }, []);
+
+  useEffect(() => {
+    if (customerList.length === 0) {
+      const markup = <EmptyState
+        heading="No customers found"
+        action={{ content: 'Add customer', onAction: handleCustomerCreate, icon: PersonAddIcon }}
+        image="https://cdn.shopify.com/s/files/1/2376/3301/products/emptystate-files.png"
+      />
+      setEmptyStateMarkup(markup);
+    }
+  }, [customerList])
 
   return (
     <AppProvider i18n={enTranslations}>
       <Page title="Customers">
         <ErrorMessage userErrors={userErrors} dismissErrorMessage={() => setUserErrors([])} tone='critical' title={editFlag ? "Customer update failed" : "Customer creation failed"} />
+        <DeleteConfirmationModal isOpen={showDeleteConfirmation} handleChange={handleDeleteConfirmation} customer={customer} tone='critical' deleteCustomer={deleteCustomer} />
         <Card>
           <ResourceList
             showHeader
             resourceName={{ singular: 'customer', plural: 'customers' }}
+            emptyState={emptyStateMarkup}
             items={customerList}
-            alternateTool={<Button icon={PlusIcon} onClick={() => { setActive(true); setEditFlag(false); clearCustomer(); setUserErrors([]) }}>Add customer</Button>}
+            alternateTool={<Button icon={PersonAddIcon} onClick={handleCustomerCreate}>Add customer</Button>}
             pagination={{
               hasPrevious: pageInfo?.hasPreviousPage || false,
-              onPrevious: handlePreviousPage,
+              onPrevious: () => { handlePagination('backward') },
               hasNext: pageInfo?.hasNextPage || false,
-              onNext: handleNextPage,
+              onNext: () => { handlePagination('forward') },
             }}
             loading={isLoading}
             renderItem={(customer) => {
               const { id, firstName, lastName, email, phone, image } = customer;
               const media = <Avatar customer source={image?.url} size="lg" alt="" name={firstName} />;
-              const shortcutActions = [{ icon: EditIcon, onClick: () => { handleEdit(customer) }, variant: "plain", accessibilityLabel: "Edit customer" }, { icon: DeleteIcon, onClick: () => { handleDelete(id) }, tone: "critical", variant: "plain", accessibilityLabel: "Delete customer" }];
+              const shortcutActions = [{ icon: EditIcon, onClick: () => { handleEdit(customer) }, variant: "plain", accessibilityLabel: "Edit customer" }, { icon: DeleteIcon, onClick: () => { handleDelete(customer) }, tone: "critical", variant: "plain", accessibilityLabel: "Delete customer" }];
 
               return (
                 <ResourceItem id={id} media={media} accessibilityLabel={`View details for ${firstName}`} shortcutActions={shortcutActions}  >
@@ -198,7 +272,7 @@ function App() {
           />
         </Card>
 
-        <CustomerModal active={active} action={editFlag ? "Update" : "Save"} customer={customer} tagsString={tagsString} handleModalChange={handleModalChange} handleSubmit={handleSubmit} handleInputChange={handleInputChange} errors={errors} clearCustomer={clearCustomer} />
+        <CustomerModal active={active} action={editFlag ? "Update" : "Save"} customer={customer} tagsString={tagsString} handleModalChange={handleModalChange} handleSubmit={handleSubmit} handleInputChange={handleInputChange} errors={errors} clearCustomerForm={clearCustomerForm} />
       </Page>
     </AppProvider>
   );

@@ -12,7 +12,7 @@ const CustomerModal = ({
   customer,
   errors,
   tagsString,
-  clearCustomer,
+  clearCustomerForm,
   handleSubmit,
   handleInputChange,
   handleModalChange,
@@ -21,6 +21,7 @@ const CustomerModal = ({
     <Modal
       open={active}
       onClose={handleModalChange}
+      instant={false}
       title= {action ==='Update' ? "Update existing customer" : "Create new customer"}
       primaryAction={{
         content: action,
@@ -31,7 +32,7 @@ const CustomerModal = ({
       secondaryActions={[
         {
           content: "Cancel",
-          onAction: ()=>{handleModalChange();clearCustomer();},
+          onAction: ()=>{handleModalChange();clearCustomerForm();},
           accessibilityLabel:"Cancel"
         },
       ]}
@@ -75,6 +76,7 @@ const CustomerModal = ({
                 label="Tags"
                 value={tagsString}
                 onChange={(val) => handleInputChange(val, "tags")}
+                helpText="Enter each tags separated by commas ( , ) (e.g., TAG1,TAG2)."
               />
             </FormLayout>
           </Form>

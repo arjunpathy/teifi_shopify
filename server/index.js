@@ -1,3 +1,5 @@
+require('dotenv').config({ path: '../server/.env.local' });
+
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
@@ -12,7 +14,6 @@ const headers = {
   'Content-Type': 'application/json',
   'X-Shopify-Access-Token': ACCESS_TOKEN
 };
-require('dotenv').config()
 
 // Create Customer
 app.post('/customers', async (req, res) => {
@@ -35,6 +36,10 @@ app.post('/customers', async (req, res) => {
             email
             tags
             phone
+            image{
+                id
+                url
+            }
           }
           userErrors {
             field
@@ -60,10 +65,11 @@ app.post('/customers', async (req, res) => {
 
 // Get Customers
 app.get('/customers', async (req, res) => {
-  const { first = 10, cursor } = req.query;
+  const { limit = 5, direction, cursor } = req.query;
+  let queryString = (direction === 'forward') ? `first:${limit}, ${cursor ? `after: "${cursor},"` : ''}` : `last:${limit}, ${cursor ? `before: "${cursor},"` : ''}`
   const query = `
      {
-        customers(first: ${first}, ${cursor ? `after: "${cursor}"` : ''}) {
+        customers(${queryString}) {
           edges {
             node {
               id
@@ -116,7 +122,6 @@ let formatCustomers = (data) => {
     customer.node.id = customerId || null;
     customers.push(customer.node);
   });
-  // return customers.reverse();
   return customers;
 }
 
@@ -146,6 +151,10 @@ app.put('/customers/:id', async (req, res) => {
             email
             tags
             phone
+            image{
+                id
+                url
+            }
           }
           userErrors {
             field
