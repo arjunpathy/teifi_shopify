@@ -1,25 +1,20 @@
 require('dotenv').config({ path: '../server/.env.local' });
 
 const express = require('express');
-const axios = require('axios');
 const cors = require('cors');
 const app = express();
 app.use(express.json());
 app.use(cors());
+const { fetchShopifyData, formatCustomers } = require('./utils/serverUtils');
 
-const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
-const tagValue = '42';
-const headers = {
-  'Content-Type': 'application/json',
-  'X-Shopify-Access-Token': ACCESS_TOKEN
-};
+const TAG_VALUE = '42';
+const PAGINATION_LIMIT = 5;
 
 // Create Customer
 app.post('/customers', async (req, res) => {
 
   const customer = req.body;
-  if (!customer.tags.includes(tagValue)) customer.tags.push(tagValue); //any customer created through this application is tagged with '42'
+  if (!customer.tags.includes(TAG_VALUE)) customer.tags.push(TAG_VALUE); //any customer created through this application is tagged with '42'
   const query = `
       mutation {
         customerCreate(input: {
@@ -50,13 +45,8 @@ app.post('/customers', async (req, res) => {
     `;
 
   try {
-    const response = await axios({
-      url: SHOPIFY_API_URL,
-      method: 'POST',
-      headers,
-      data: JSON.stringify({ query })
-    });
-    res.send(response.data);
+    const data = await fetchShopifyData(query);
+    res.send(data);
   } catch (error) {
     console.error(error.response ? error.response.data : error.message);
     res.status(500).send({ error: 'Failed to create customer' });
@@ -65,8 +55,11 @@ app.post('/customers', async (req, res) => {
 
 // Get Customers
 app.get('/customers', async (req, res) => {
-  const { limit = 5, direction, cursor } = req.query;
-  let queryString = (direction === 'forward') ? `first:${limit}, ${cursor ? `after: "${cursor},"` : ''}` : `last:${limit}, ${cursor ? `before: "${cursor},"` : ''}`
+  const { limit = PAGINATION_LIMIT, direction = 'forward', cursor = '' } = req.query;
+
+  let queryString = (direction === 'forward')
+    ? `first: ${limit}${cursor ? `, after: "${cursor}"` : ''}, reverse: true`
+    : `last: ${limit}${cursor ? `, before: "${cursor}"` : ''}, reverse: true`;
   const query = `
      {
         customers(${queryString}) {
@@ -93,37 +86,18 @@ app.get('/customers', async (req, res) => {
         }
       }
     `;
-
   try {
-    const response = await axios({
-      url: SHOPIFY_API_URL,
-      method: 'POST',
-      headers,
-      data: JSON.stringify({ query })
-    });
-
-    const customerData = response.data.data.customers;
-    let formattedCustomerData = await formatCustomers(customerData);
+    const data = await fetchShopifyData(query);
+    let formattedCustomerData = await formatCustomers(data.customers);
     res.send({
       customers: formattedCustomerData,
-      pageInfo: customerData.pageInfo
+      pageInfo: data.customers.pageInfo
     });
-
   } catch (error) {
     console.error(error.response ? error.response.data : error.message);
     res.status(500).send({ error: 'Failed to fetch customers' });
   }
 });
-
-let formatCustomers = (data) => {
-  let customers = [];
-  data.edges.forEach(customer => {
-    const customerId = customer.node.id.split('/').pop();
-    customer.node.id = customerId || null;
-    customers.push(customer.node);
-  });
-  return customers;
-}
 
 // Update Customer
 app.put('/customers/:id', async (req, res) => {
@@ -131,7 +105,7 @@ app.put('/customers/:id', async (req, res) => {
   const id = `gid://shopify/Customer/${req.params.id}`
   const { firstName, lastName, email, tags, phone } = req.body;
 
-  if (!tags.includes(tagValue)) tags.push(tagValue) //any customer updated through this application is also tagged with '42'
+  if (!tags.includes(TAG_VALUE)) tags.push(TAG_VALUE) //any customer updated through this application is also tagged with '42'
 
   const query = `
       mutation {
@@ -164,13 +138,8 @@ app.put('/customers/:id', async (req, res) => {
       }
     `;
   try {
-    const response = await axios({
-      url: SHOPIFY_API_URL,
-      method: 'POST',
-      headers,
-      data: JSON.stringify({ query })
-    });
-    res.send(response.data);
+    const data = await fetchShopifyData(query);
+    res.send(data);
   } catch (error) {
     console.error(error.response ? error.response.data : error.message);
     res.status(500).send({ error: 'Failed to update customer' });
@@ -199,19 +168,15 @@ app.delete('/customers/:id', async (req, res) => {
       }
     `;
   try {
-    const response = await axios({
-      url: SHOPIFY_API_URL,
-      method: 'POST',
-      headers,
-      data: JSON.stringify({ query })
-    });
-    res.send(response.data);
+    const data = await fetchShopifyData(query);
+    res.send(data);
   } catch (error) {
     console.error(error.response ? error.response.data : error.message);
     res.status(500).send({ error: 'Failed to delete customer' });
   }
 });
 
-app.listen(3030, () => {
-  console.log('Server running on port 3030');
+const serverPort = process.env.SHOPIFY_SERVER_PORT;
+app.listen(serverPort, () => {
+  console.log('Server running on ', serverPort);
 });

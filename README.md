@@ -1,70 +1,125 @@
-# Getting Started with Create React App
+# Shopify Customer Management App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This is a full-stack Shopify customer management application built with React (frontend) and Node.js (backend). The app allows you to perform CRUD operations (Create, Read, Update, Delete) on Shopify customers using the Shopify Admin API.
 
-## Available Scripts
+## Table of Contents
 
-In the project directory, you can run:
+- Installation
+- Environment Variables
+- Features
+- Technologies Used
+- Running the App
+- Endpoints
+- Notes
 
-### `npm start`
+## Installation
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+1. Clone the repository:
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+   ```
+   git clone https://github.com/arjunpathy/teifi_shopify.git
+   cd teifi_shopify
+   ```
 
-### `npm test`
+2. Install the dependencies for both frontend and backend:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+   **Frontend (React)**
 
-### `npm run build`
+   ```
+   cd app/client
+   npm install
+   ```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+   **Backend (Node.js)**
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+   ```
+   cd app/server
+   npm install
+   ```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Environment Variables
 
-### `npm run eject`
+Create `.env.local` files for both the frontend and backend to store the necessary environment variables.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+**Frontend (app/client/.env.local)**
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```
+REACT_APP_SHOPIFY_SERVER_URL=http://localhost:5000
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+**Backend (app/server/.env.local)**
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```
+SHOPIFY_API_URL=https://<your-shopify-domain>/admin/api/2024-07/graphql.json
+ACCESS_TOKEN=<your-shopify-access-token>
+SHOPIFY_SERVER_PORT=5000
+```
 
-## Learn More
+Note: Replace `<your-shopify-domain>` and `<your-shopify-access-token>` with your actual store domain and access token.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Features
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- Add, edit, delete, and list customers from your Shopify store.
+- Pagination for customer list.
+- Input validation for customer details.
+- Error handling and user feedback.
 
-### Code Splitting
+## Technologies Used
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+- **Frontend:** React, Shopify Polaris
+- **Backend:** Node.js, Express
+- **Database:** Not applicable (uses Shopify API)
+- **Others:** CORS, dotenv, libphonenumber-js
 
-### Analyzing the Bundle Size
+## Running the App
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+1. Start the backend server:
 
-### Making a Progressive Web App
+   ```
+   cd app/server
+   node index.js
+   ```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+2. Start the frontend:
+   ```
+   cd app/client
+   npm start
+   ```
 
-### Advanced Configuration
+## Endpoints
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+- **Create Customer:** `POST /customers`
+    - Creates a new customer in the Shopify store. The customer is automatically tagged with "42".
+    - Body parameters:
+        - firstName: Customer's first name
+        - lastName: Customer's last name
+        - email: Customer's email
+        - tags: (Optional) Array of tags
+        - phone: (Optional) Customer's phone number
 
-### Deployment
+- **Get Customers:** `GET /customers?cursor={cursor}&direction={direction}&limit={limit}`
+    - Fetches a paginated list of customers. Supports forward and backward pagination.
+    - Query parameters:
+        - limit: (Optional) The number of customers to fetch per page (default is PAGINATION_LIMIT from .env.local).
+        - direction: (Optional) Defines the pagination direction:
+            - forward (default): Fetches the next set of results.
+            - backward: Fetches the previous set of results.
+        - cursor: (Optional) Cursor for pagination to fetch the next or previous set of customers.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+- **Update Customer:** `PUT /customers/:id`
+    - Updates customer details in the Shopify store. The customer is automatically tagged with "42" if not already tagged.
+    - Body parameters:
+        - firstName: Customer's first name
+        - lastName: Customer's last name
+        - email: Customer's email
+        - tags: (Optional) Array of tags
+        - phone: (Optional) Customer's phone number
 
-### `npm run build` fails to minify
+- **Delete Customer:** `DELETE /customers/:id`
+    - Deletes a customer from the Shopify store by ID.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+## Notes
+
+- Ensure you have the necessary permissions and access tokens to interact with the Shopify API.
+- The app uses cursor-based pagination to efficiently navigate through customer lists.
