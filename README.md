@@ -1,6 +1,6 @@
 # Shopify Customer Management App
 
-This is a full-stack Shopify customer management application built with React (frontend) and Node.js (backend). The app allows you to perform CRUD operations (Create, Read, Update, Delete) on Shopify customers using the Shopify Admin API.
+This is a full-stack Shopify customer management application built with React (frontend), GraphQL and Node.js (backend). The app allows you to perform CRUD operations (Create, Read, Update, Delete) on Shopify customers using the Shopify Admin API.
 
 ## Table of Contents
 
